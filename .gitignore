@@ -1,0 +1,13 @@
+# Generated dictionary packs and the large Wiktionary source cache.
+output/
+
+# Python cache and local environments.
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local tooling.
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,107 @@
+name: Generate Dictionary Packs
+
+# Run manually from GitHub:
+# Actions → Generate Dictionary Packs → Run workflow
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r scripts/requirements.txt
+
+      - name: Download NLTK data
+        run: |
+          python - <<'PY'
+          import nltk
+
+          for package in ("wordnet", "omw-1.4", "cmudict", "words"):
+              nltk.download(package, raise_on_error=True)
+
+          print("All NLTK data downloaded.")
+          PY
+
+      - name: Generate dictionary packs
+        run: python scripts/generate_dicts.py
+
+      - name: Validate generated files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          expected=(
+            output/dict_minimal_v1.db.gz
+            output/dict_standard_v1.db.gz
+            output/dict_full_v1.db.gz
+            output/checksums.txt
+          )
+
+          for file in "${expected[@]}"; do
+            test -s "$file"
+          done
+
+          for pack in MINIMAL STANDARD FULL; do
+            grep -Eq "^${pack}[[:space:]]*=[[:space:]]*[0-9a-f]{64}$" output/checksums.txt
+          done
+
+          echo "Generated files:"
+          ls -lh "${expected[@]}"
+          echo
+          cat output/checksums.txt
+
+      - name: Delete old dictionary release if it exists
+        continue-on-error: true
+        run: gh release delete dict-v1 --yes --cleanup-tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish dictionary packs as GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dict-v1
+          name: Dictionary Packs v1
+          body: |
+            ## Dictionary Packs
+
+            Auto-generated from Wiktionary + WordNet 3.1 + CMU Pronouncing Dictionary + Hindi WordNet (OMW).
+
+            | Pack | Words | Size | Contents |
+            |------|-------|------|----------|
+            | `dict_minimal_v1.db.gz` | 10,000 | ~15 MB | Top WordNet words by frequency + Hindi |
+            | `dict_standard_v1.db.gz` | ~146,000 | ~80 MB | All WordNet (single + compound) + Hindi |
+            | `dict_full_v1.db.gz` | ~700K–900K | ~200 MB | Wiktionary + WordNet merged + Hindi |
+
+            ### Data sources
+            - **Wiktionary English** (kaikki.org JSONL) — CC BY-SA 3.0
+            - **WordNet 3.1** (Princeton University) — free for all use
+            - **CMU Pronouncing Dictionary** — Public Domain
+            - **Hindi WordNet / OMW 1.4** (Open Multilingual WordNet) — CC BY 3.0
+
+            ### SHA-256 checksums
+            See `checksums.txt` attached to this release.
+          files: |
+            output/dict_minimal_v1.db.gz
+            output/dict_standard_v1.db.gz
+            output/dict_full_v1.db.gz
+            output/checksums.txt
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
