@@ -62,7 +62,10 @@ git remote add origin https://github.com/neet-ctrl/lexipopup-dictionary-packs.gi
 git push -u origin main
 ```
 
-Replace `neet-ctrl/lexipopup-dictionary-packs` with the destination repository.
+The prepared export is already published at
+`neet-ctrl/lexipopup-dictionary-packs`. If you reuse this folder for a
+different repository, replace that owner/repository name in the commands and
+URLs below.
 
 If the destination repository already has a Git history and you want to place
 these files into it, copy the contents of this folder into that repository's
